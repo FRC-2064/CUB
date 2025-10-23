@@ -16,6 +16,7 @@ package frc.robot;
 import com.pathplanner.lib.auto.AutoBuilder;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.wpilibj.Filesystem;
 import edu.wpi.first.wpilibj.GenericHID;
 import edu.wpi.first.wpilibj.XboxController;
 import edu.wpi.first.wpilibj2.command.Command;
@@ -34,7 +35,12 @@ import frc.robot.subsystems.vision.Vision;
 import frc.robot.subsystems.vision.VisionIO;
 import frc.robot.subsystems.vision.VisionIOLimelight;
 import frc.robot.subsystems.vision.VisionIOPhotonVisionSim;
+import frc.robot.util.Kapok.Reefscape.ReefscapeAutoBuilder;
+import frc.robot.util.Kapok.Roots.Routine;
 
+import java.io.File;
+
+import org.littletonrobotics.junction.Logger;
 import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
 
 /**
@@ -47,6 +53,8 @@ public class RobotContainer {
   // Subsystems
   private final Drive drive;
   private final Vision vision;
+
+  private final ReefscapeAutoBuilder autoBuilder;
 
   // Controller
   private final CommandXboxController controller = new CommandXboxController(0);
@@ -98,6 +106,8 @@ public class RobotContainer {
         vision = new Vision(drive::addVisionMeasurement, new VisionIO() {}, new VisionIO() {});
         break;
     }
+
+    autoBuilder = new ReefscapeAutoBuilder(this);
 
     // Set up auto routines
     autoChooser = new LoggedDashboardChooser<>("Auto Choices", AutoBuilder.buildAutoChooser());
@@ -168,6 +178,13 @@ public class RobotContainer {
    * @return the command to run in autonomous
    */
   public Command getAutonomousCommand() {
-    return autoChooser.get();
+    File f = new File(Filesystem.getDeployDirectory(), "Kapok/First.json");
+    try {
+        Routine routine = Routine.loadFromJson(f);
+        return autoBuilder.buildAutoCommand(routine); 
+    } catch (Exception e) {
+        Logger.recordOutput("Auto/Routine", "Failed to find auto, starting default.");
+        return autoChooser.get();
+    }
   }
 }
