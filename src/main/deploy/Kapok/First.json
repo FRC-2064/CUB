@@ -1,5 +1,10 @@
 {
   "name": "First",
   "source": "R",
-  "tasks": ["F3", "E3", "F2", "E2"]
+  "tasks": [
+    "F3",
+    "E3",
+    "F2",
+    "E2"
+  ]
 }

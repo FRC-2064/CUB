@@ -23,6 +23,7 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
+import frc.robot.commands.AlignToTag;
 import frc.robot.commands.DriveCommands;
 import frc.robot.generated.TunerConstants;
 import frc.robot.subsystems.drive.Drive;
@@ -34,14 +35,14 @@ import frc.robot.subsystems.drive.ModuleIOTalonFX;
 import frc.robot.subsystems.vision.Vision;
 import frc.robot.subsystems.vision.VisionIO;
 import frc.robot.subsystems.vision.VisionIOLimelight;
-import frc.robot.subsystems.vision.VisionIOPhotonVisionSim;
 import frc.robot.util.Kapok.Reefscape.ReefscapeAutoBuilder;
+import frc.robot.util.Kapok.Reefscape.ReefscapeVisionAlignment;
 import frc.robot.util.Kapok.Roots.Routine;
-
 import java.io.File;
-
 import org.littletonrobotics.junction.Logger;
 import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
+
+import frc.robot.util.Kapok.Reefscape.ReefscapeVisionAlignment;
 
 /**
  * This class is where the bulk of the robot should be declared. Since Command-based is a
@@ -51,10 +52,11 @@ import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
  */
 public class RobotContainer {
   // Subsystems
-  private final Drive drive;
-  private final Vision vision;
+  public final Drive drive;
+  public final Vision vision;
 
   private final ReefscapeAutoBuilder autoBuilder;
+  private final ReefscapeVisionAlignment visionAlignment;
 
   // Controller
   private final CommandXboxController controller = new CommandXboxController(0);
@@ -78,7 +80,8 @@ public class RobotContainer {
             new Vision(
                 drive::addVisionMeasurement,
                 new VisionIOLimelight("limelight-one", drive::getRotation),
-                new VisionIOLimelight("limelight-two", drive::getRotation));
+                new VisionIOLimelight("limelight-two", drive::getRotation)),
+                new VisionIO;
         break;
 
       case SIM:
@@ -107,6 +110,7 @@ public class RobotContainer {
         break;
     }
 
+    visionAlignment = new ReefscapeVisionAlignment(this);
     autoBuilder = new ReefscapeAutoBuilder(this);
 
     // Set up auto routines
@@ -170,6 +174,17 @@ public class RobotContainer {
                             new Pose2d(drive.getPose().getTranslation(), new Rotation2d())),
                     drive)
                 .ignoringDisable(true));
+
+    // Align to tag 7 when Y button is held
+    controller
+        .y()
+        .whileTrue(
+            new AlignToTag(
+                drive,
+                visionAlignment,
+                7, // Target tag ID
+                new Pose2d(1.0, 0.0, Rotation2d.fromDegrees(180.0)) // 1m in front, facing the tag
+                ));
   }
 
   /**
@@ -180,11 +195,11 @@ public class RobotContainer {
   public Command getAutonomousCommand() {
     File f = new File(Filesystem.getDeployDirectory(), "Kapok/First.json");
     try {
-        Routine routine = Routine.loadFromJson(f);
-        return autoBuilder.buildAutoCommand(routine); 
+      Routine routine = Routine.loadFromJson(f);
+      return autoBuilder.buildAutoCommand(routine);
     } catch (Exception e) {
-        Logger.recordOutput("Auto/Routine", "Failed to find auto, starting default.");
-        return autoChooser.get();
+      Logger.recordOutput("Auto/Routine", "Failed to find auto, starting default.");
+      return autoChooser.get();
     }
   }
 }
