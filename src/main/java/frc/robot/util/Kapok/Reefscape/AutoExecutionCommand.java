@@ -17,13 +17,17 @@ public class AutoExecutionCommand extends Command {
     this.stateMachine = stateMachine;
     this.startingPose = startingPose;
 
-    // make sure the required items are up
-    addRequirements(getRequirements());
+    // Require drive subsystem so default command doesn't interfere
+    // Pathfinding command will be manually executed, not scheduled
+    addRequirements(robot.drive);
   }
 
   @Override
   public void initialize() {
-    // reset odom to starting pose using container
+    // reset odom to starting pose
+    robot.drive.setPose(startingPose);
+    org.littletonrobotics.junction.Logger.recordOutput("Kapok/Auto/StartingPose", startingPose);
+    org.littletonrobotics.junction.Logger.recordOutput("Kapok/Auto/Initialized", true);
 
     // start the state machine
     stateMachine.setWantedState(WantedState.EXECUTE_AUTO);

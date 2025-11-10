@@ -64,9 +64,10 @@
   ],
   "editor.defaultFormatter": "richardwillis.vscode-spotless-gradle",
   "[json]": {
-    "editor.defaultFormatter": "richardwillis.vscode-spotless-gradle"
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
   "[java]": {
-    "editor.defaultFormatter": "richardwillis.vscode-spotless-gradle"
-  }
+    "editor.defaultFormatter": "redhat.java"
+  },
+  "java.debug.settings.onBuildFailureProceed": true
 }

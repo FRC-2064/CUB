@@ -1,9 +1,8 @@
-package frc.robot.util.Kapok.Roots;
+package frc.robot.util.Kapok.Roots.vision;
 
 import edu.wpi.first.math.geometry.Pose2d;
-import edu.wpi.first.units.measure.Angle;
-
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
+import edu.wpi.first.units.measure.Angle;
 
 public abstract class VisionAlignmentHelper {
   public static class AlignmentResult {
@@ -22,6 +21,9 @@ public abstract class VisionAlignmentHelper {
   }
 
   public abstract AlignmentResult alignToTarget(int targetTagID, Pose2d targetPose);
+
+  /** Set the target pose for the PID controllers before starting alignment */
+  public abstract void setTarget(Pose2d targetPose);
 
   protected boolean isWithinTolerance(
       Pose2d current,

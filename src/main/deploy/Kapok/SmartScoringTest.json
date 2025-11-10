@@ -1,0 +1,23 @@
+{
+  "name": "SmartScoringTest",
+  "startingPose": [
+    7.45496300863132,
+    2.088224414303329,
+    180.0
+  ],
+  "tasks": [
+    "SCORE:AUTO",
+    "PICKUP:FEEDER_R",
+    "SCORE:AUTO",
+    "PICKUP:FEEDER_R",
+    "SCORE:AUTO",
+    "PICKUP:FEEDER_R",
+    "SCORE:AUTO",
+    "PICKUP:FEEDER_R",
+    "SCORE:AUTO",
+    "PICKUP:FEEDER_L",
+    "SCORE:AUTO",
+    "PICKUP:FEEDER_L",
+    "SCORE:AUTO"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "name": "RightFeederTest",
+  "startingPose": [
+    7.45496300863132,
+    2.088224414303329,
+    180.0
+  ],
+  "tasks": [
+    "SCORE:F2",
+    "PICKUP:FEEDER_R",
+    "SCORE:E2",
+    "PICKUP:FEEDER_R",
+    "SCORE:F3",
+    "PICKUP:FEEDER_R",
+    "SCORE:E3"
+  ]
+}

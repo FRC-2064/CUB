@@ -1,10 +1,10 @@
 package frc.robot.util.Kapok.Reefscape;
 
 import frc.robot.RobotContainer;
-import frc.robot.util.Kapok.Roots.Context;
-import frc.robot.util.Kapok.Roots.StateMachine;
-import frc.robot.util.Kapok.Roots.Task;
-import frc.robot.util.Kapok.Roots.VisionAlignmentHelper;
+import frc.robot.util.Kapok.Roots.core.Context;
+import frc.robot.util.Kapok.Roots.core.StateMachine;
+import frc.robot.util.Kapok.Roots.core.Task;
+import frc.robot.util.Kapok.Roots.vision.VisionAlignmentHelper;
 import org.littletonrobotics.junction.Logger;
 
 public class ReefscapeStateMachine
@@ -45,13 +45,13 @@ public class ReefscapeStateMachine
       case IDLE:
         return CurrentState.IDLE;
       case EXECUTE_AUTO:
-        if (context.completed()) {
+        if (context.isComplete()) {
           return CurrentState.COMPLETE;
         }
 
         Task currentTask = context.getCurrentTask();
 
-        switch (currentTask.getCurrentPhase()) {
+        switch (currentTask.getCurrentState()) {
           case PATHFINDING:
             return CurrentState.PATHFINDING_TO_APPROACH;
           case VISION_ALIGNMENT:
@@ -125,7 +125,7 @@ public class ReefscapeStateMachine
         visionHelper.alignToTarget(task.getTargetAprilTagID(), task.getTargetPose());
 
     if (result.isAligned) {
-      task.setCurrentPhase(Task.Phase.EXECUTING);
+      task.setCurrentState(Task.State.EXECUTING);
     } else if (!result.tagVisible) {
       Logger.recordOutput("Auto/VisionAlignment/TagNotVisible", true);
     }
@@ -139,7 +139,7 @@ public class ReefscapeStateMachine
     }
 
     // check the superstructure if it has coral
-    task.setCurrentPhase(Task.Phase.COMPLETE);
+    task.setCurrentState(Task.State.COMPLETE);
   }
 
   private void handleScore() {
@@ -150,7 +150,7 @@ public class ReefscapeStateMachine
     }
 
     // check the superstructure if scoring is done
-    task.setCurrentPhase(Task.Phase.COMPLETE);
+    task.setCurrentState(Task.State.COMPLETE);
   }
 
   private void handleTransitioning() {

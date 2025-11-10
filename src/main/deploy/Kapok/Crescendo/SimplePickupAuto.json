@@ -1,0 +1,12 @@
+{
+  "name": "Simple Pickup Auto",
+  "startingPose": [
+    1.5,
+    5.55,
+    0
+  ],
+  "tasks": [
+    "PICKUP:NOTE_SPIKE_B2",
+    "SCORE_SPEAKER:SPEAKER_BLUE"
+  ]
+}

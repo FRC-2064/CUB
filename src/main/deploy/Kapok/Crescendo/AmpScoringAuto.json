@@ -1,0 +1,14 @@
+{
+  "name": "Amp Scoring Auto",
+  "startingPose": [
+    1.5,
+    7.0,
+    90
+  ],
+  "tasks": [
+    "PICKUP:NOTE_SPIKE_B3",
+    "SCORE_AMP:AMP_BLUE",
+    "PICKUP:NOTE_SPIKE_B2",
+    "SCORE_AMP:AMP_BLUE"
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "name": "IN_RANGE Shooting Auto",
+  "description": "Demonstrates IN_RANGE scoring strategy - robot drives into range, waits for systems to be ready, then shoots. Inspired by Team 2910's 2024 code.",
+  "startingPose": [
+    1.5,
+    5.5,
+    0.0
+  ],
+  "tasks": [
+    "SHOOT:AUTO",
+    "INTAKE:GROUND:NOTE1",
+    "SHOOT:AUTO",
+    "INTAKE:GROUND:NOTE2",
+    "SHOOT:AUTO",
+    "INTAKE:GROUND:NOTE3",
+    "SHOOT:AUTO"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "name": "Drive By Shooting Auto",
+  "startingPose": [
+    1.5,
+    5.55,
+    0
+  ],
+  "tasks": [
+    "PICKUP:NOTE_SPIKE_B2",
+    "SCORE_SPEAKER:SPEAKER_BLUE",
+    "PICKUP:NOTE_SPIKE_B1",
+    "SCORE_SPEAKER:SPEAKER_BLUE",
+    "PICKUP:NOTE_C3",
+    "SCORE_SPEAKER:SPEAKER_BLUE"
+  ]
+}

@@ -19,11 +19,13 @@ import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.wpilibj.Filesystem;
 import edu.wpi.first.wpilibj.GenericHID;
 import edu.wpi.first.wpilibj.XboxController;
+import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
-import frc.robot.commands.AlignToTag;
+// import frc.robot.commands.AlignToTag; // TODO: Implement this command
 import frc.robot.commands.DriveCommands;
 import frc.robot.generated.TunerConstants;
 import frc.robot.subsystems.drive.Drive;
@@ -32,17 +34,18 @@ import frc.robot.subsystems.drive.GyroIOPigeon2;
 import frc.robot.subsystems.drive.ModuleIO;
 import frc.robot.subsystems.drive.ModuleIOSim;
 import frc.robot.subsystems.drive.ModuleIOTalonFX;
+import frc.robot.subsystems.orchestra.OrchestraSubsystem;
+import frc.robot.subsystems.vision.Cameras;
 import frc.robot.subsystems.vision.Vision;
 import frc.robot.subsystems.vision.VisionIO;
 import frc.robot.subsystems.vision.VisionIOLimelight;
+import frc.robot.util.Kapok.Crescendo.CrescendoAutoBuilder;
 import frc.robot.util.Kapok.Reefscape.ReefscapeAutoBuilder;
 import frc.robot.util.Kapok.Reefscape.ReefscapeVisionAlignment;
-import frc.robot.util.Kapok.Roots.Routine;
+import frc.robot.util.Kapok.Roots.core.Routine;
 import java.io.File;
 import org.littletonrobotics.junction.Logger;
 import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
-
-import frc.robot.util.Kapok.Reefscape.ReefscapeVisionAlignment;
 
 /**
  * This class is where the bulk of the robot should be declared. Since Command-based is a
@@ -54,8 +57,10 @@ public class RobotContainer {
   // Subsystems
   public final Drive drive;
   public final Vision vision;
+  public final OrchestraSubsystem orchestra;
 
-  private final ReefscapeAutoBuilder autoBuilder;
+  private final CrescendoAutoBuilder crescendoAutoBuilder;
+  private final ReefscapeAutoBuilder reefscapeAutoBuilder;
   private final ReefscapeVisionAlignment visionAlignment;
 
   // Controller
@@ -63,6 +68,7 @@ public class RobotContainer {
 
   // Dashboard inputs
   private final LoggedDashboardChooser<Command> autoChooser;
+  private final SendableChooser<String> yearChooser;
 
   /** The container for the robot. Contains subsystems, OI devices, and commands. */
   public RobotContainer() {
@@ -79,9 +85,10 @@ public class RobotContainer {
         vision =
             new Vision(
                 drive::addVisionMeasurement,
-                new VisionIOLimelight("limelight-one", drive::getRotation),
-                new VisionIOLimelight("limelight-two", drive::getRotation)),
-                new VisionIO;
+                new VisionIOLimelight(
+                    "limelight-one", Cameras.LIMELIGHT_ONE.cameraToRobot, drive::getRotation),
+                new VisionIOLimelight(
+                    "limelight-two", Cameras.LIMELIGHT_TWO.cameraToRobot, drive::getRotation));
         break;
 
       case SIM:
@@ -111,7 +118,17 @@ public class RobotContainer {
     }
 
     visionAlignment = new ReefscapeVisionAlignment(this);
-    autoBuilder = new ReefscapeAutoBuilder(this);
+    crescendoAutoBuilder = new CrescendoAutoBuilder(this);
+    reefscapeAutoBuilder = new ReefscapeAutoBuilder(this);
+
+    // Initialize orchestra subsystem
+    orchestra = new OrchestraSubsystem();
+
+    // Set up year chooser
+    yearChooser = new SendableChooser<>();
+    yearChooser.setDefaultOption("Crescendo (2024)", "Crescendo");
+    yearChooser.addOption("Reefscape (2025)", "Reefscape");
+    SmartDashboard.putData("Kapok Year", yearChooser);
 
     // Set up auto routines
     autoChooser = new LoggedDashboardChooser<>("Auto Choices", AutoBuilder.buildAutoChooser());
@@ -175,16 +192,18 @@ public class RobotContainer {
                     drive)
                 .ignoringDisable(true));
 
+    // TODO: Implement AlignToTag command
     // Align to tag 7 when Y button is held
-    controller
-        .y()
-        .whileTrue(
-            new AlignToTag(
-                drive,
-                visionAlignment,
-                7, // Target tag ID
-                new Pose2d(1.0, 0.0, Rotation2d.fromDegrees(180.0)) // 1m in front, facing the tag
-                ));
+    // controller
+    //     .y()
+    //     .whileTrue(
+    //         new AlignToTag(
+    //             drive,
+    //             visionAlignment,
+    //             7, // Target tag ID
+    //             new Pose2d(1.0, 0.0, Rotation2d.fromDegrees(180.0)) // 1m in front, facing the
+    // tag
+    //             ));
   }
 
   /**
@@ -193,11 +212,40 @@ public class RobotContainer {
    * @return the command to run in autonomous
    */
   public Command getAutonomousCommand() {
-    File f = new File(Filesystem.getDeployDirectory(), "Kapok/First.json");
+    System.out.println("========== GET AUTONOMOUS COMMAND CALLED ==========");
+
+    String selectedYear = yearChooser.getSelected();
+    System.out.println("Selected year: " + selectedYear);
+    Logger.recordOutput("Auto/SelectedYear", selectedYear);
+
+    File f;
+    if ("Reefscape".equals(selectedYear)) {
+      f = new File(Filesystem.getDeployDirectory(), "Kapok/RightFeederTest.json");
+    } else {
+      f = new File(Filesystem.getDeployDirectory(), "Kapok/Crescendo/DriveByShootingAuto.json");
+    }
+
+    System.out.println("File path: " + f.getAbsolutePath());
+    System.out.println("File exists: " + f.exists());
+    Logger.recordOutput("Auto/FilePath", f.getAbsolutePath());
+    Logger.recordOutput("Auto/FileExists", f.exists());
+
     try {
+      System.out.println("Attempting to load routine...");
       Routine routine = Routine.loadFromJson(f);
-      return autoBuilder.buildAutoCommand(routine);
+      System.out.println("Routine loaded: " + routine.getName());
+      Logger.recordOutput("Auto/Routine", "Loaded: " + routine.getName());
+
+      if ("Reefscape".equals(selectedYear)) {
+        return reefscapeAutoBuilder.buildAutoCommand(routine);
+      } else {
+        return crescendoAutoBuilder.buildAutoCommand(routine);
+      }
     } catch (Exception e) {
+      System.out.println("ERROR loading auto: " + e.getMessage());
+      e.printStackTrace();
+      Logger.recordOutput("Auto/Error", e.getMessage());
+      Logger.recordOutput("Auto/ErrorType", e.getClass().getName());
       Logger.recordOutput("Auto/Routine", "Failed to find auto, starting default.");
       return autoChooser.get();
     }
