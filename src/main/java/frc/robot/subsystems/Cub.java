@@ -3,6 +3,8 @@ package frc.robot.subsystems;
 import static edu.wpi.first.units.Units.*;
 
 import com.pathplanner.lib.path.PathConstraints;
+import edu.wpi.first.math.geometry.Pose3d;
+import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.units.measure.AngularAcceleration;
@@ -13,6 +15,21 @@ import edu.wpi.first.units.measure.LinearVelocity;
 import edu.wpi.first.units.measure.Time;
 
 public class Cub {
+
+  /** Field and AprilTag constants */
+  public static class FieldElements {
+    /**
+     * 3D pose of AprilTag 7 (Blue Alliance Speaker Center)
+     * Position in meters: (x, y, z) relative to field origin
+     * Rotation: facing the field (+X axis)
+     */
+    public static final Pose3d TAG_7_POSE =
+        new Pose3d(
+            0.0,      // X position (meters) - at blue alliance wall
+            5.55,     // Y position (meters) - centered on speaker
+            1.451,    // Z position (meters) - height of tag
+            new Rotation3d(0.0, 0.0, 0.0)); // Facing +X direction
+  }
 
   /** SuperStructure alignment configuration */
   public static class SuperStructureAlignment {

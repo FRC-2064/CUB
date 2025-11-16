@@ -2,6 +2,8 @@ package frc.robot.subsystems;
 
 import static edu.wpi.first.units.Units.*;
 
+import com.pathplanner.lib.auto.AutoBuilder;
+import com.pathplanner.lib.path.PathConstraints;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.ProfiledPIDController;
 import edu.wpi.first.math.geometry.Pose2d;
@@ -11,6 +13,7 @@ import edu.wpi.first.math.geometry.Transform2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.subsystems.drive.Drive;
 import frc.robot.subsystems.vision.Vision;
@@ -39,6 +42,9 @@ public class SuperStructure extends SubsystemBase {
   public enum State {
     /** Manual control - no automated behavior */
     MANUAL,
+
+    /** Pathfinding to a target pose using PathPlanner */
+    PATHFINDING,
 
     /** Driving to and aligning with an AprilTag */
     ALIGNING,
@@ -73,6 +79,10 @@ public class SuperStructure extends SubsystemBase {
   private Pose2d lastKnownTagPose = null;
   private Pose2d desiredRobotPose = null;
   private double lastTagSeenTime = 0.0;
+
+  // Pathfinding
+  private Command pathfindingCommand = null;
+  private Pose2d pathfindingTargetPose = null;
 
   // PID Controllers for alignment
   private final ProfiledPIDController xController;
@@ -203,6 +213,41 @@ public class SuperStructure extends SubsystemBase {
     }
   }
 
+  /**
+   * Starts pathfinding to a target pose using PathPlanner.
+   *
+   * @param targetPose The target pose to pathfind to
+   */
+  public void startPathfinding(Pose2d targetPose) {
+    this.pathfindingTargetPose = targetPose;
+    setWantedState(State.PATHFINDING);
+  }
+
+  /**
+   * Starts pathfinding to an AprilTag with optional offset, then aligns using vision.
+   * This combines pathfinding and vision alignment for robust autonomous navigation.
+   *
+   * @param tagId The AprilTag ID to navigate to
+   * @param offset The desired offset from the tag
+   */
+  public void pathfindAndAlignToTag(int tagId, Transform2d offset) {
+    this.targetTagId = tagId;
+    this.targetOffset = offset;
+
+    // Get the tag's 3D pose and convert to 2D for pathfinding
+    Optional<Pose3d> tagPose3dOpt = VisionConstants.aprilTagLayout.getTagPose(tagId);
+    if (tagPose3dOpt.isEmpty()) {
+      System.err.println("Cannot pathfind to tag " + tagId + " - tag not in layout");
+      return;
+    }
+
+    // Calculate target pose: tag pose + offset
+    Pose2d tagPose2d = tagPose3dOpt.get().toPose2d();
+    this.pathfindingTargetPose = tagPose2d.transformBy(offset);
+
+    setWantedState(State.PATHFINDING);
+  }
+
   /** Stops all SuperStructure actions and returns to manual control. */
   public void stopAndReturnToManual() {
     setWantedState(State.MANUAL);
@@ -252,6 +297,10 @@ public class SuperStructure extends SubsystemBase {
     switch (currentState) {
       case MANUAL:
         // No automated control
+        break;
+
+      case PATHFINDING:
+        executePathfinding();
         break;
 
       case ALIGNING:
@@ -317,6 +366,15 @@ public class SuperStructure extends SubsystemBase {
   /** Called when entering a new state. */
   private void enterState(State state) {
     switch (state) {
+      case PATHFINDING:
+        // Create and schedule pathfinding command
+        if (pathfindingTargetPose != null) {
+          PathConstraints constraints = Cub.Pathfinding.CONSTRAINTS;
+          pathfindingCommand = AutoBuilder.pathfindToPose(pathfindingTargetPose, constraints, 0.0);
+          pathfindingCommand.schedule();
+        }
+        break;
+
       case ALIGNING:
         // Reset PID controllers
         xController.reset(drive.getPose().getX());
@@ -347,7 +405,19 @@ public class SuperStructure extends SubsystemBase {
 
   /** Called when exiting a state. */
   private void exitState(State state) {
-    // Cleanup if needed
+    switch (state) {
+      case PATHFINDING:
+        // Cancel pathfinding command if it's running
+        if (pathfindingCommand != null && pathfindingCommand.isScheduled()) {
+          pathfindingCommand.cancel();
+        }
+        pathfindingCommand = null;
+        break;
+
+      default:
+        // No cleanup needed for other states
+        break;
+    }
   }
 
   /** Executes the ALIGNING state - drives to and aligns with the target tag. */
@@ -440,6 +510,43 @@ public class SuperStructure extends SubsystemBase {
 
     // For now, just rotate (command integration would add translation)
     drive.runVelocity(new ChassisSpeeds(0.0, 0.0, omega));
+  }
+
+  /** Executes the PATHFINDING state - uses PathPlanner to navigate to target pose. */
+  private void executePathfinding() {
+    if (pathfindingCommand == null) {
+      // No pathfinding command, something went wrong
+      System.err.println("Pathfinding command is null in PATHFINDING state");
+      setWantedState(State.MANUAL);
+      return;
+    }
+
+    // Check if pathfinding is complete
+    if (!pathfindingCommand.isScheduled()) {
+      // Pathfinding finished
+      // If we have a target tag, transition to vision alignment
+      if (targetTagId >= 0) {
+        setWantedState(State.ALIGNING);
+      } else {
+        // No tag to align to, just stop
+        setWantedState(State.STOPPED);
+      }
+      return;
+    }
+
+    // Check if we're close enough to the target and tag is visible
+    if (targetTagId >= 0 && isTagVisible() && pathfindingTargetPose != null) {
+      Pose2d currentPose = drive.getPose();
+      double distanceToTarget =
+          currentPose.getTranslation().getDistance(pathfindingTargetPose.getTranslation());
+
+      // Switch to vision alignment if we're within threshold
+      if (distanceToTarget < Cub.Pathfinding.VISION_SWITCH_DISTANCE_METERS) {
+        setWantedState(State.ALIGNING);
+      }
+    }
+
+    // Pathfinding command is running, it handles the driving
   }
 
   /** Executes the SEARCHING state - slowly rotates to search for lost tag. */
