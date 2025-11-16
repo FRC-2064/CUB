@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Reefscape specific context for autonomous execution. Provides access to robot state, field state,
+ * Reefscape specific context for autonomous routines. Provides access to robot state, field state,
  * and game specific information.
  */
 public class ReefscapeContext extends Context {

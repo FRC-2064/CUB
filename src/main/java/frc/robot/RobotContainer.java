@@ -16,7 +16,8 @@ package frc.robot;
 import com.pathplanner.lib.auto.AutoBuilder;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
-import edu.wpi.first.wpilibj.Filesystem;
+import edu.wpi.first.math.geometry.Transform2d;
+import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.wpilibj.GenericHID;
 import edu.wpi.first.wpilibj.XboxController;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
@@ -24,27 +25,21 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
+import edu.wpi.first.wpilibj2.command.button.Trigger;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
-// import frc.robot.commands.AlignToTag; // TODO: Implement this command
 import frc.robot.commands.DriveCommands;
 import frc.robot.generated.TunerConstants;
+import frc.robot.subsystems.SuperStructure;
 import frc.robot.subsystems.drive.Drive;
 import frc.robot.subsystems.drive.GyroIO;
 import frc.robot.subsystems.drive.GyroIOPigeon2;
 import frc.robot.subsystems.drive.ModuleIO;
 import frc.robot.subsystems.drive.ModuleIOSim;
 import frc.robot.subsystems.drive.ModuleIOTalonFX;
-import frc.robot.subsystems.orchestra.OrchestraSubsystem;
 import frc.robot.subsystems.vision.Cameras;
 import frc.robot.subsystems.vision.Vision;
 import frc.robot.subsystems.vision.VisionIO;
 import frc.robot.subsystems.vision.VisionIOLimelight;
-import frc.robot.util.Kapok.Crescendo.CrescendoAutoBuilder;
-import frc.robot.util.Kapok.Reefscape.ReefscapeAutoBuilder;
-import frc.robot.util.Kapok.Reefscape.ReefscapeVisionAlignment;
-import frc.robot.util.Kapok.Roots.core.Routine;
-import java.io.File;
-import org.littletonrobotics.junction.Logger;
 import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
 
 /**
@@ -57,11 +52,7 @@ public class RobotContainer {
   // Subsystems
   public final Drive drive;
   public final Vision vision;
-  public final OrchestraSubsystem orchestra;
-
-  private final CrescendoAutoBuilder crescendoAutoBuilder;
-  private final ReefscapeAutoBuilder reefscapeAutoBuilder;
-  private final ReefscapeVisionAlignment visionAlignment;
+  public final SuperStructure superStructure;
 
   // Controller
   private final CommandXboxController controller = new CommandXboxController(0);
@@ -69,6 +60,9 @@ public class RobotContainer {
   // Dashboard inputs
   private final LoggedDashboardChooser<Command> autoChooser;
   private final SendableChooser<String> yearChooser;
+
+  // Joystick deadband for manual control detection
+  private static final double JOYSTICK_DEADBAND = 0.1;
 
   /** The container for the robot. Contains subsystems, OI devices, and commands. */
   public RobotContainer() {
@@ -117,12 +111,10 @@ public class RobotContainer {
         break;
     }
 
-    visionAlignment = new ReefscapeVisionAlignment(this);
-    crescendoAutoBuilder = new CrescendoAutoBuilder(this);
-    reefscapeAutoBuilder = new ReefscapeAutoBuilder(this);
-
-    // Initialize orchestra subsystem
-    orchestra = new OrchestraSubsystem();
+    // Initialize SuperStructure
+    superStructure = new SuperStructure(drive, vision);
+    // Set alignment camera (0 = first limelight, 1 = second limelight)
+    superStructure.setAlignmentCamera(0);
 
     // Set up year chooser
     yearChooser = new SendableChooser<>();
@@ -154,6 +146,17 @@ public class RobotContainer {
   }
 
   /**
+   * Checks if the driver is providing manual joystick input.
+   *
+   * @return true if any joystick axis exceeds the deadband threshold
+   */
+  private boolean hasManualInput() {
+    return Math.abs(controller.getLeftY()) > JOYSTICK_DEADBAND
+        || Math.abs(controller.getLeftX()) > JOYSTICK_DEADBAND
+        || Math.abs(controller.getRightX()) > JOYSTICK_DEADBAND;
+  }
+
+  /**
    * Use this method to define your button->command mappings. Buttons can be created by
    * instantiating a {@link GenericHID} or one of its subclasses ({@link
    * edu.wpi.first.wpilibj.Joystick} or {@link XboxController}), and then passing it to a {@link
@@ -167,6 +170,21 @@ public class RobotContainer {
             () -> -controller.getLeftY(),
             () -> -controller.getLeftX(),
             () -> -controller.getRightX()));
+
+    // Cancel SuperStructure alignment/aiming when driver moves joystick
+    new Trigger(this::hasManualInput)
+        .onTrue(
+            Commands.runOnce(
+                () -> {
+                  SuperStructure.State currentState = superStructure.getCurrentState();
+                  // Cancel alignment, aiming, or searching, but not snap-to-target or manual
+                  if (currentState == SuperStructure.State.ALIGNING
+                      || currentState == SuperStructure.State.AIMING
+                      || currentState == SuperStructure.State.SEARCHING) {
+                    superStructure.stopAndReturnToManual();
+                  }
+                },
+                superStructure));
 
     // Lock to 0° when A button is held
     controller
@@ -192,18 +210,54 @@ public class RobotContainer {
                     drive)
                 .ignoringDisable(true));
 
-    // TODO: Implement AlignToTag command
-    // Align to tag 7 when Y button is held
-    // controller
-    //     .y()
-    //     .whileTrue(
-    //         new AlignToTag(
-    //             drive,
-    //             visionAlignment,
-    //             7, // Target tag ID
-    //             new Pose2d(1.0, 0.0, Rotation2d.fromDegrees(180.0)) // 1m in front, facing the
-    // tag
-    //             ));
+    // Y button - Toggle alignment to AprilTag 7 (stays in range, follows the tag)
+    // First press: Start following and maintaining position relative to tag
+    // Second press: Stop following and return to manual control
+    // Auto-cancels: Yes (on joystick movement)
+    controller
+        .y()
+        .onTrue(
+            Commands.runOnce(
+                () -> {
+                  if (superStructure.getCurrentState() == SuperStructure.State.ALIGNING) {
+                    // Already aligning, stop and return to manual
+                    superStructure.stopAndReturnToManual();
+                  } else {
+                    // Start alignment - will continuously follow the tag
+                    superStructure.startAlignment(
+                        7, // Target tag ID
+                        new Transform2d(
+                            new Translation2d(1.0, 0.0), // 1m in front of tag
+                            Rotation2d.fromDegrees(180.0))); // Face the tag
+                  }
+                },
+                superStructure));
+
+    // Right Bumper - Toggle aim at AprilTag 7 (rotation only, tracks tag rotation)
+    controller
+        .rightBumper()
+        .onTrue(
+            Commands.runOnce(
+                () -> {
+                  if (superStructure.getCurrentState() == SuperStructure.State.AIMING) {
+                    // Already aiming, stop and return to manual
+                    superStructure.stopAndReturnToManual();
+                  } else {
+                    // Start aiming - will continuously track tag rotation
+                    superStructure.startAiming(7);
+                  }
+                },
+                superStructure));
+
+    // Left Bumper - Toggle snap-to-target mode for AprilTag 7
+    controller
+        .leftBumper()
+        .onTrue(Commands.runOnce(() -> superStructure.toggleSnapToTarget(7), superStructure));
+
+    // Back button - Emergency stop SuperStructure and return to manual
+    controller
+        .back()
+        .onTrue(Commands.runOnce(superStructure::stopAndReturnToManual, superStructure));
   }
 
   /**
@@ -212,42 +266,6 @@ public class RobotContainer {
    * @return the command to run in autonomous
    */
   public Command getAutonomousCommand() {
-    System.out.println("========== GET AUTONOMOUS COMMAND CALLED ==========");
-
-    String selectedYear = yearChooser.getSelected();
-    System.out.println("Selected year: " + selectedYear);
-    Logger.recordOutput("Auto/SelectedYear", selectedYear);
-
-    File f;
-    if ("Reefscape".equals(selectedYear)) {
-      f = new File(Filesystem.getDeployDirectory(), "Kapok/RightFeederTest.json");
-    } else {
-      f = new File(Filesystem.getDeployDirectory(), "Kapok/Crescendo/DriveByShootingAuto.json");
-    }
-
-    System.out.println("File path: " + f.getAbsolutePath());
-    System.out.println("File exists: " + f.exists());
-    Logger.recordOutput("Auto/FilePath", f.getAbsolutePath());
-    Logger.recordOutput("Auto/FileExists", f.exists());
-
-    try {
-      System.out.println("Attempting to load routine...");
-      Routine routine = Routine.loadFromJson(f);
-      System.out.println("Routine loaded: " + routine.getName());
-      Logger.recordOutput("Auto/Routine", "Loaded: " + routine.getName());
-
-      if ("Reefscape".equals(selectedYear)) {
-        return reefscapeAutoBuilder.buildAutoCommand(routine);
-      } else {
-        return crescendoAutoBuilder.buildAutoCommand(routine);
-      }
-    } catch (Exception e) {
-      System.out.println("ERROR loading auto: " + e.getMessage());
-      e.printStackTrace();
-      Logger.recordOutput("Auto/Error", e.getMessage());
-      Logger.recordOutput("Auto/ErrorType", e.getClass().getName());
-      Logger.recordOutput("Auto/Routine", "Failed to find auto, starting default.");
-      return autoChooser.get();
-    }
+    return autoChooser.get();
   }
 }

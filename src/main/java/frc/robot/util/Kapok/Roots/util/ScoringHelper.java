@@ -86,7 +86,6 @@ public class ScoringHelper {
     }
   }
 
-
   /**
    * Calculate distance between two poses.
    *

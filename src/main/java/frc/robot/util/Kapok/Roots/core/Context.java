@@ -8,7 +8,7 @@ import java.util.List;
 /**
  * Base context class for autonomous execution.
  *
- * <p>The Context manages the task list and provides an interface for game-specific state. Game-
+ * <p>The Context manages the task list and provides an interface for game specific state. Game
  * specific implementations should extend this class and add:
  *
  * <ul>

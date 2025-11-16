@@ -1,9 +1,58 @@
 package frc.robot.subsystems;
 
+import static edu.wpi.first.units.Units.*;
+
 import com.pathplanner.lib.path.PathConstraints;
 import edu.wpi.first.math.util.Units;
+import edu.wpi.first.units.measure.Angle;
+import edu.wpi.first.units.measure.AngularAcceleration;
+import edu.wpi.first.units.measure.AngularVelocity;
+import edu.wpi.first.units.measure.Distance;
+import edu.wpi.first.units.measure.LinearAcceleration;
+import edu.wpi.first.units.measure.LinearVelocity;
+import edu.wpi.first.units.measure.Time;
 
 public class Cub {
+
+  /** SuperStructure alignment configuration */
+  public static class SuperStructureAlignment {
+    // Alignment PID gains (X and Y translation)
+    public static final double ALIGNMENT_LINEAR_KP = 3.5;
+    public static final double ALIGNMENT_LINEAR_KI = 0.0;
+    public static final double ALIGNMENT_LINEAR_KD = 0.1;
+
+    // Alignment angular PID gains (rotation during full alignment)
+    public static final double ALIGNMENT_ANGULAR_KP = 4.0;
+    public static final double ALIGNMENT_ANGULAR_KI = 0.0;
+    public static final double ALIGNMENT_ANGULAR_KD = 0.1;
+
+    // Aiming PID gains (rotation-only mode)
+    public static final double AIM_ANGULAR_KP = 5.0;
+    public static final double AIM_ANGULAR_KI = 0.0;
+    public static final double AIM_ANGULAR_KD = 0.2;
+
+    // Motion constraints for alignment
+    public static final LinearVelocity MAX_ALIGNMENT_VELOCITY = MetersPerSecond.of(2.5);
+    public static final LinearAcceleration MAX_ALIGNMENT_ACCELERATION =
+        MetersPerSecondPerSecond.of(3.0);
+    public static final AngularVelocity MAX_ALIGNMENT_ANGULAR_VELOCITY = RadiansPerSecond.of(3.0);
+    public static final AngularAcceleration MAX_ALIGNMENT_ANGULAR_ACCELERATION =
+        RadiansPerSecond.per(Second).of(4.0);
+
+    // Motion constraints for aiming
+    public static final AngularVelocity MAX_AIM_ANGULAR_VELOCITY = RadiansPerSecond.of(4.0);
+    public static final AngularAcceleration MAX_AIM_ANGULAR_ACCELERATION =
+        RadiansPerSecond.per(Second).of(6.0);
+
+    // Tolerances
+    public static final Distance POSITION_TOLERANCE = Meters.of(0.05);
+    public static final Angle ROTATION_TOLERANCE = Degrees.of(2.0);
+    public static final Angle AIM_TOLERANCE = Degrees.of(1.0);
+
+    // Tag tracking
+    public static final Time TAG_LOST_TIMEOUT = Seconds.of(0.5);
+    public static final AngularVelocity SEARCH_ROTATION_SPEED = RadiansPerSecond.of(1.0);
+  }
 
   /** Pathfinding configuration */
   public static class Pathfinding {
